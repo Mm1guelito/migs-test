@@ -185,7 +185,7 @@
                         <div class="social-post-item post-item <%= post.platform %>">
                             <p><strong><%= post.name %>(<%= post.platform.capitalize %> post):</strong></p>
                             <div class="post-content">
-                                <%= post.content.html_safe %>
+                                <%= post.content&.html_safe || 'No content available' %>
                             </div>
                         </div>
                     <% end %>
