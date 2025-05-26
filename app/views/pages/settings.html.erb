@@ -1,0 +1,190 @@
+<%# Render the top navigation bar %>
+<%= render 'shared/top_nav' %>
+<%# Main container for settings page %>
+<div class="container pt-10">
+  <div class="settings-card">
+    <div class="card-content">
+      <%# Gmail Accounts Section %>
+      <div class="gmail-section">
+        <h2 class="section-title">Gmail Accounts</h2>
+        <%# List of connected Gmail accounts %>
+        <div id="gmail-accounts">
+          <%# Primary account (cannot be removed) %>
+          <% if current_user.primary_account %>
+            <div class="gmail-account primary">
+              <div class="account-info">
+                <div class="account-avatar">
+                  <%= current_user.primary_account.first_name[0] %><%= current_user.primary_account.last_name[0] %>
+                </div>
+                <div>
+                  <div class="account-email"><%= current_user.primary_account.email %></div>
+                  <div class="account-status">Primary Account</div>
+                </div>
+              </div>
+            </div>
+          <% end %>
+          <%# Secondary accounts (can be removed if not current user) %>
+          <% current_user.secondary_accounts.each do |account| %>
+            <div class="gmail-account">
+              <div class="account-info">
+                <div class="account-avatar">
+                  <%= account.first_name[0] %><%= account.last_name[0] %>
+                </div>
+                <div>
+                  <div class="account-email"><%= account.email %></div>
+                  <div class="account-status">
+                    <%= account.email == current_user.email ? 'Current Account' : 'Connected' %>
+                  </div>
+                </div>
+              </div>
+              <%# Only show remove button if it's not the current user's account %>
+              <% if account.email != current_user.email %>
+                <div class="account-actions">
+                  <%= button_to remove_account_path(account), 
+                              method: :delete,
+                              class: "remove-btn",
+                              data: { confirm: "Are you sure you want to remove this account?" } do %>
+                    Remove
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+        <%# Add new Gmail account button %>
+        <%= form_tag '/auth/google_oauth2', method: :post, data: { turbo: false } do %>
+          <%= button_tag type: 'submit', class: 'add-gmail-btn' do %>
+            <span class="plus-icon">+</span>
+            Add Gmail Account
+          <% end %>
+        <% end %>
+      </div>
+
+      <%# LinkedIn Accounts Section %>
+      <div class="linkedin-section">
+        <h2 class="section-title">LinkedIn Accounts</h2>
+        <div id="linkedin-accounts">
+          <%# Primary account (cannot be removed) %>
+          <% if current_user.primary_linkedin_account %>
+            <div class="linkedin-account primary">
+              <div class="account-info">
+                <div class="account-avatar">
+                  <%= current_user.primary_linkedin_account.first_name[0] %><%= current_user.primary_linkedin_account.last_name[0] %>
+                </div>
+                <div>
+                  <div class="account-email"><%= current_user.primary_linkedin_account.email %></div>
+                  <div class="account-status">Primary Account</div>
+                  <% if current_user.primary_linkedin_account.headline.present? %>
+                    <div class="account-headline"><%= current_user.primary_linkedin_account.headline %></div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+          <%# Secondary accounts (can be removed if not current user) %>
+          <% current_user.secondary_linkedin_accounts.each do |account| %>
+            <div class="linkedin-account">
+              <div class="account-info">
+                <div class="account-avatar">
+                  <%= account.first_name[0] %><%= account.last_name[0] %>
+                </div>
+                <div>
+                  <div class="account-email"><%= account.email %></div>
+                  <div class="account-status">
+                    <%= account.email == current_user.email ? 'Current Account' : 'Connected' %>
+                  </div>
+                  <% if account.headline.present? %>
+                    <div class="account-headline"><%= account.headline %></div>
+                  <% end %>
+                </div>
+              </div>
+              <%# Only show remove button if it's not the current user's account %>
+              <% if account.email != current_user.email %>
+                <div class="account-actions">
+                  <%= button_to remove_linkedin_account_path(account), 
+                              method: :delete,
+                              class: "remove-btn",
+                              data: { confirm: "Are you sure you want to remove this account?" } do %>
+                    Remove
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+        <%# Add new LinkedIn account button %>
+        <%= form_tag '/auth/linkedin', method: :post, data: { turbo: false } do %>
+          <%= button_tag type: 'submit', class: 'add-linkedin-btn' do %>
+            <span class="plus-icon">+</span>
+            Add LinkedIn Account
+          <% end %>
+        <% end %>
+      </div>
+
+      <%# Social Media Section %>
+      <div class="social-section">
+        <h2 class="section-title">Social Media Accounts</h2>
+        <div class="social-accounts">
+          <%# Facebook connection card %>
+          <div class="social-card facebook">
+            <div class="social-icon facebook-icon">f</div>
+            <div class="social-name">Facebook</div>
+            <div class="social-status">Not Connected</div>
+            <div class="connected-email"></div>
+          </div>
+        </div>
+      </div>
+
+      <%# Bot Configuration Section %>
+      <div style="margin-top: 2rem; padding: 1.5rem; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 style="font-size: 1.25rem; font-weight: 600; color: #333; margin-bottom: 0.5rem;">Bot Timing Configuration</h2>
+          <p style="color: #666; font-size: 0.875rem;">Set the interval for automated posting on each platform</p>
+        </div>
+        
+        <%= form_with(model: SocialBotConfig.first_or_create, local: true) do |f| %>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <%# Facebook Timing %>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; border: 1px solid #e9ecef;">
+              <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                <div style="width: 32px; height: 32px; background: #1877f2; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem;">
+                  <i class="fab fa-facebook-f" style="color: white;"></i>
+                </div>
+                <h3 style="font-size: 1rem; font-weight: 600; color: #333; margin: 0;">Facebook</h3>
+              </div>
+              <div>
+                <%= f.label :facebook, "Posting Interval", style: "display: block; margin-bottom: 0.5rem; font-size: 0.875rem; color: #666;" %>
+                <%= f.select :facebook, 
+                    options_for_select((0..60).map { |i| [i == 0 ? "Disabled" : "#{i} minutes", i] }, f.object.facebook),
+                    {},
+                    style: "width: 100%; padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; background: white;" %>
+              </div>
+            </div>
+
+            <%# LinkedIn Timing %>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; border: 1px solid #e9ecef;">
+              <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                <div style="width: 32px; height: 32px; background: #0a66c2; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem;">
+                  <i class="fab fa-linkedin-in" style="color: white;"></i>
+                </div>
+                <h3 style="font-size: 1rem; font-weight: 600; color: #333; margin: 0;">LinkedIn</h3>
+              </div>
+              <div>
+                <%= f.label :linkedin, "Posting Interval", style: "display: block; margin-bottom: 0.5rem; font-size: 0.875rem; color: #666;" %>
+                <%= f.select :linkedin, 
+                    options_for_select((0..60).map { |i| [i == 0 ? "Disabled" : "#{i} minutes", i] }, f.object.linkedin),
+                    {},
+                    style: "width: 100%; padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; background: white;" %>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align: right;">
+            <%= f.submit "Save Timing Settings", 
+                style: "background: linear-gradient(135deg, #4ade80 0%, #06b6d4 50%, #3b82f6 100%); color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; transition: all 0.2s ease;" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

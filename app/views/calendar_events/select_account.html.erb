@@ -1,0 +1,31 @@
+<%= render 'shared/top_nav' %>
+<div class="container pt-16">
+  <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+    <h2 class="text-2xl font-bold mb-6">Select Account to Join Meeting</h2>
+    
+    <div class="space-y-4">
+      <% @google_accounts.each do |account| %>
+        <div class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+          <div class="flex items-center">
+            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+              <%= account.email.first.upcase %>
+            </div>
+            <div class="ml-4">
+              <div class="font-medium"><%= account.email %></div>
+              <div class="text-sm text-gray-500">
+                <%= account.first_name %> <%= account.last_name %>
+              </div>
+            </div>
+          </div>
+          <%= link_to "Use this account", 
+              join_and_schedule_bot_calendar_event_path(@event, google_account_id: account.id),
+              class: "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="mt-6 text-center">
+      <%= link_to "Add another account", '/auth/google_oauth2', class: "text-blue-600 hover:text-blue-800" %>
+    </div>
+  </div>
+</div> 

@@ -1,0 +1,2 @@
+class BotConfiguration < ApplicationRecord
+end

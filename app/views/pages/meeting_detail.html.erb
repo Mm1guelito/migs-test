@@ -1,0 +1,465 @@
+<%= render 'shared/top_nav' %>
+<%= stylesheet_link_tag 'meeting_details', media: 'all' %>
+
+<div class="main-container pt-10">
+    <!-- Left Panel -->
+    <div class="left-panel">
+        <button class="back-button" onclick="window.location.href='/past_meetings'">
+            ← Back to Past Meetings
+        </button>
+        <!-- Meeting Header -->
+        <div class="meeting-header">
+            <h1 class="meeting-title"><%= @event.title %></h1>
+            <div class="meeting-meta">
+                <div class="meta-item">
+                    <span class="meta-label">Date & Time</span>
+                    <span class="meta-value">
+                        <%= @event.date.present? ? Date.parse(@event.date).strftime('%B %d, %Y') : @event.start_time_in_timezone.strftime('%B %d, %Y') %> • <%= @event.start_time_24h %> - <%= @event.end_time_24h %>
+                    </span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Platform</span>
+                    <span class="meta-value">
+                        <% if @event.meeting_url&.include?('zoom.us') %>
+                            Zoom
+                        <% elsif @event.meeting_url&.include?('meet.google.com') %>
+                            Google Meet
+                        <% elsif @event.meeting_url&.include?('teams.microsoft.com') %>
+                            Teams
+                        <% else %>
+                            Other
+                        <% end %>
+                    </span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Duration</span>
+                    <span class="meta-value">
+                        <% if @event.start_time && @event.end_time %>
+                            <%= distance_of_time_in_words(@event.start_time, @event.end_time) %>
+                        <% else %>
+                            N/A
+                        <% end %>
+                    </span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Attendees</span>
+                    <div class="attendees">
+                        <% if @event.attendees.present? %>
+                            <% @event.attendees.each do |attendee| %>
+                                <span class="attendee"><%= attendee %></span>
+                            <% end %>
+                        <% else %>
+                            <span class="attendee">No guests</span>
+                        <% end %>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Action Cards as a Square -->
+        <div class="actions-square">
+            <div class="action-card active" onclick="showContent('transcript')" id="transcriptCard">
+                <h3 class="action-title">View Full Transcript</h3>
+                <p class="action-description">Read the complete conversation and discussion points from this meeting</p>
+            </div>
+            <div class="action-card" onclick="showContent('email')" id="emailCard">
+                <h3 class="action-title">AI-Generated Follow-up Email</h3>
+                <p class="action-description">Get a draft email recapping what was discussed and next steps</p>
+            </div>
+            <div class="action-card" onclick="showContent('social')" id="socialCard">
+                <h3 class="action-title">Social Media Posts</h3>
+                <p class="action-description">View automatically created social media posts based on meeting insights</p>
+            </div>
+        </div>
+    </div>
+    <!-- Right Panel -->
+    <div class="right-panel">
+        <!-- Transcript Content -->
+        <div id="transcriptContent">
+            <div class="content-header">
+                <h2 class="content-title">Meeting Recording & Transcript</h2>
+                <p class="content-subtitle">Video recording and complete conversation from <%= @event.title %> meeting</p>
+            </div>
+            <div class="content-body">
+                <% if @recording && @recording[:video_url].present? %>
+                    <div class="video-container">
+                        <video controls class="meeting-video">
+                            <source src="<%= @recording[:video_url] %>" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                <% end %>
+                <div class="transcript-content">
+                    <% if @event.recall_transcript.present? %>
+                        <% @event.recall_transcript.each do |message| %>
+                            <div class="message-text">
+                                <strong><%= message['speaker'] %>:</strong> <%= message['words'].map { |w| w['text'] }.join(' ') %>
+                            </div>
+                        <% end %>
+                    <% else %>
+                        <p>No transcript available for this meeting.</p>
+                    <% end %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Content -->
+        <div id="emailContent" class="hidden">
+            <div class="content-header">
+                <h2 class="content-title">Follow-up Email Draft</h2>
+                <p class="content-subtitle">AI-generated summary of meeting discussion</p>
+            </div>
+            <div class="content-body">
+                <div class="email-content">
+                    <% if @event.recall_transcript.present? %>
+                        <% email_content = EmailGeneratorService.generate_email(@event.recall_transcript, @event.title, current_user) %>
+                        <% if email_content.present? %>
+                            <!-- Copy Button -->
+                            <div style="text-align: right; margin-bottom: 15px;">
+                                <button onclick="copyEmailContent()" class="btn btn-secondary" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                                    📋 Copy Draft
+                                </button>
+                            </div>
+                            
+                            <!-- Email Content -->
+                            <div id="emailText" class="email-formatted" style="white-space: pre-wrap; font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; line-height: 1.6; text-align: left !important;">
+                                <div style="text-align: left !important; width: 100%;">
+                                    <%= email_content.gsub(/\r?\n/, '<br>').html_safe %>
+                                </div>
+                            </div>
+                            
+                            <!-- Hidden textarea for copying -->
+                            <textarea id="emailContentForCopy" style="position: absolute; left: -9999px; opacity: 0;"><%= email_content %></textarea>
+                            
+                        <% else %>
+                            <p>Unable to generate email content at this time. Please try again later.</p>
+                        <% end %>
+                    <% else %>
+                        <p>No transcript available to generate email content.</p>
+                    <% end %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Social Media Content -->
+        <div id="socialContent" class="hidden">
+            <div class="social-content-header">
+                <div>
+                    <h2 class="social-content-title">Generated Social Media Posts</h2>
+                    <p class="social-content-subtitle">Automatically created posts based on meeting insights</p>
+                </div>
+            </div>
+            <div class="social-content-body">
+                <!-- Draft Section -->
+                <div class="social-draft-section">
+                    <div class="social-draft-header">
+                        <h2 class="social-draft-title">Draft post</h2>
+                    </div>
+                    <p class="social-draft-subtitle">Generate a post based on insights from this meeting.</p>
+                    
+                    <div class="social-draft-content">
+                        <% if @social_post_content.present? %>
+                            <%= simple_format(@social_post_content) %>
+                        <% else %>
+                            <p>No social post could be generated for this meeting.</p>
+                        <% end %>
+                    </div>
+                    
+                    <!-- Hidden textarea for copying social post -->
+                    <textarea id="socialPostContentForCopy" style="position: absolute; left: -9999px; opacity: 0;"><%= @social_post_content %></textarea>
+                    
+                    <div class="social-draft-actions" style="display: flex; justify-content: space-between; align-items: center;">
+                        <button class="social-btn social-btn-secondary" onclick="copySocialPostContent()">
+                            <span>📋</span> Copy
+                        </button>
+                        <div style="display: flex; gap: 0.75rem;">
+                            <button class="social-btn social-btn-configure" onclick="openConfigModal()">
+                                Configure Post
+                            </button>
+                            <button class="social-btn social-btn-primary">Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="social-posts-list">
+                    <% @existing_social_posts.each do |post| %>
+                        <div class="social-post-item post-item <%= post.platform %>">
+                            <p><strong><%= post.name %>(<%= post.platform.capitalize %> post):</strong></p>
+                            <div class="post-content">
+                                <%= post.content.html_safe %>
+                            </div>
+                        </div>
+                    <% end %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Modal -->
+        <div id="configModal" class="social-modal-overlay hidden">
+            <div class="social-modal-content">
+                <div class="social-modal-header">
+                    <h3 class="social-modal-title">Configure Post</h3>
+                    <button class="social-close-btn" onclick="closeConfigModal()">×</button>
+                </div>
+                
+                <div class="social-modal-body">
+                    <%= form_with(model: SocialPost.new, url: social_posts_path(meeting_id: @event.id), local: true) do |f| %>
+                        <div class="social-form-group">
+                            <%= f.label :name, "Name", class: "social-form-label" %>
+                            <%= f.text_field :name, class: "social-form-input", placeholder: "Enter name..." %>
+                        </div>
+                        <div class="social-form-group">
+                            <%= f.label :type, "Type", class: "social-form-label" %>
+                            <%= f.select :type, options_for_select([
+                                ['Generate post', 'generate post'],
+                                ['Edit post', 'edit post'],
+                                ['Analyze post', 'analyze post']
+                            ]), {}, class: "social-form-select" %>
+                        </div>
+                        <div class="social-form-group">
+                            <%= f.label :platform, "Platform", class: "social-form-label" %>
+                            <%= f.select :platform, options_for_select([['LinkedIn post', 'linkedin'], ['Facebook post', 'facebook']]), {}, class: "social-form-select" %>
+                        </div>
+                        <div class="social-form-group">
+                            <%= f.label :description, "Description", class: "social-form-label" %>
+                            <%= f.text_area :description, class: "social-form-textarea", rows: 6 %>
+                            <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                                <button type="button" class="social-btn social-btn-primary automate-btn" style="padding: 4px 14px; font-size: 13px; height: 28px; background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);">Automate</button>
+                            </div>
+                        </div>
+                        <div class="social-form-group">
+                            <%= f.label :example, "Example", class: "social-form-label" %>
+                            <%= f.text_area :example,
+                                value: @event.recall_transcript.present? ? SocialHelper.concatenate_transcript(@event.recall_transcript) : nil,
+                                class: "social-form-textarea",
+                                rows: 7,
+                                readonly: true
+                            %>
+                        </div>
+                        <div class="flex justify-between">
+                            <button type="button" class="py-2 px-3 rounded" style="background: #dc3545; color: #fff; border: none;">Delete</button>
+                            <div style="margin-left: auto; display: flex; gap: 1rem;">
+                                <button type="button" class="py-2 px-3 rounded" onclick="closeConfigModal()" style="background: #fff; color: #222; border: 1px solid #222;">Cancel</button>
+                                <%= f.submit "Save & close", class: "social-btn social-btn-primary" %>
+                            </div>
+                        </div>
+                    <% end %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Draft Content -->
+        <div id="draftContent" class="hidden">
+            <div class="content-header">
+                <h2 class="content-title">Create New Social Post</h2>
+                <p class="content-subtitle">Generate a custom post based on meeting insights</p>
+            </div>
+            <div class="content-body">
+                <div class="draft-form">
+                    <textarea class="draft-textarea" placeholder="AI will generate content based on your meeting discussion...">Reflecting on today's meeting. It's incredible to see how our focus on user experience translated into real results. The data shows our social media strategy is working too, with conversion rates hitting targets and exceeding our goals. Sometimes the best growth comes from listening to your users and iterating quickly. Excited to channel this momentum into the next quarter and continue building something people love. Grateful for a team that makes these wins possible! #Entrepreneurship #UserExperience #TeamWork #Growth</textarea>
+                    <div class="draft-actions">
+                        <button class="btn btn-secondary">Copy</button>
+                        <button class="btn btn-secondary">Regenerate</button>
+                        <button class="btn btn-primary">Save Post</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showContent(contentType) {
+        // Remove active class from all cards
+        document.querySelectorAll('.action-card').forEach(card => {
+            card.classList.remove('active');
+        });
+        
+        // Hide all content sections
+        document.querySelectorAll('[id$="Content"]').forEach(content => {
+            content.classList.add('hidden');
+        });
+        
+        // Show selected content and activate corresponding card
+        document.getElementById(contentType + 'Content').classList.remove('hidden');
+        document.getElementById(contentType + 'Card').classList.add('active');
+    }
+
+    // Initialize with transcript content on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        showContent('transcript');
+    });
+
+    // Social post copy functionality
+    function copySocialPostContent() {
+        const textarea = document.getElementById('socialPostContentForCopy');
+        const button = event.target;
+        
+        // Get the content and strip HTML tags while preserving spacing
+        const content = textarea.value.replace(/<[^>]*>/g, '')  // Remove HTML tags
+                                    .replace(/\n\s*\n/g, '\n\n')  // Normalize multiple newlines
+                                    .replace(/&nbsp;/g, ' ')  // Replace &nbsp; with space
+                                    .trim();  // Remove leading/trailing whitespace
+        
+        // Select and copy the text
+        textarea.value = content;  // Update textarea with cleaned content
+        textarea.select();
+        textarea.setSelectionRange(0, 99999); // For mobile devices
+        
+        try {
+            document.execCommand('copy');
+            
+            // Show success feedback
+            const originalText = button.innerHTML;
+            button.innerHTML = '✅ Copied!';
+            button.style.background = '#28a745';
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.style.background = '';
+            }, 2000);
+            
+        } catch (err) {
+            // Fallback for modern browsers
+            navigator.clipboard.writeText(content).then(() => {
+                const originalText = button.innerHTML;
+                button.innerHTML = '✅ Copied!';
+                button.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.background = '';
+                }, 2000);
+            }).catch(() => {
+                alert('Failed to copy. Please select the text manually.');
+            });
+        }
+    }
+
+    // Email copy functionality
+    function copyEmailContent() {
+        const textarea = document.getElementById('emailContentForCopy');
+        const button = event.target;
+        
+        // Get the content and strip HTML tags while preserving spacing
+        const content = textarea.value.replace(/<[^>]*>/g, '')  // Remove HTML tags
+                                    .replace(/\n\s*\n/g, '\n\n')  // Normalize multiple newlines
+                                    .replace(/&nbsp;/g, ' ')  // Replace &nbsp; with space
+                                    .trim();  // Remove leading/trailing whitespace
+        
+        // Select and copy the text
+        textarea.value = content;  // Update textarea with cleaned content
+        textarea.select();
+        textarea.setSelectionRange(0, 99999); // For mobile devices
+        
+        try {
+            document.execCommand('copy');
+            
+            // Show success feedback
+            const originalText = button.textContent;
+            button.textContent = '✅ Copied!';
+            button.style.background = '#28a745';
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = '#007bff';
+            }, 2000);
+            
+        } catch (err) {
+            // Fallback for modern browsers
+            navigator.clipboard.writeText(content).then(() => {
+                const originalText = button.textContent;
+                button.textContent = '✅ Copied!';
+                button.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '#007bff';
+                }, 2000);
+            }).catch(() => {
+                alert('Failed to copy. Please select the text manually.');
+            });
+        }
+    }
+
+    // Modal functionality - Simplified
+    function openConfigModal() {
+        const modal = document.getElementById('configModal');
+        modal.classList.remove('hidden');
+    }
+    
+    function closeConfigModal() {
+        const modal = document.getElementById('configModal');
+        modal.classList.add('hidden');
+    }
+    
+    function saveConfig() {
+        // Here you would typically save the configuration
+        // For demo purposes, we'll just close the modal
+        closeConfigModal();
+        
+        // You could add logic here to generate new posts based on configuration
+        console.log('Configuration saved:', {
+            name: document.getElementById('postName').value,
+            type: document.getElementById('postType').value,
+            platform: document.getElementById('postPlatform').value,
+            description: document.getElementById('postDescription').value
+        });
+    }
+    
+    // Close modal when clicking outside
+    document.addEventListener('click', function(e) {
+        const modal = document.getElementById('configModal');
+        if (e.target === modal) {
+            closeConfigModal();
+        }
+    });
+    
+    // Close modal when pressing Escape key
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('configModal');
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            closeConfigModal();
+        }
+    });
+
+    // Add this to your existing JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+        const automateBtn = document.querySelector('.automate-btn');
+        if (automateBtn) {
+            automateBtn.addEventListener('click', function() {
+                const requirements = document.querySelector('textarea[name="social_post[description]"]').value;
+                const exampleField = document.querySelector('textarea[name="social_post[example]"]');
+                
+                fetch('/social_posts/automate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        meeting_id: '<%= @event.id %>',
+                        requirements: requirements
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.content) {
+                        // Strip HTML tags and decode HTML entities for plain text
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = data.content;
+                        let plainText = tempDiv.textContent || tempDiv.innerText || '';
+                        // Normalize spacing
+                        plainText = plainText.replace(/\n\s*\n/g, '\n\n').replace(/ +/g, ' ').trim();
+                        exampleField.value = plainText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to generate post. Please try again.');
+                });
+            });
+        }
+    });
+</script>

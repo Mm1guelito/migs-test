@@ -1,0 +1,17 @@
+<nav class="top-nav">
+  <div class="nav-container">
+    <div >
+      <a href="/"><%= image_tag 'jump-logo-text.png', style: 'height: 40px; width: auto; display: block;' %></a>
+    </div>
+    <div class="nav-center">
+      <ul class="nav-links">
+        <li><a href="/welcome" class="<%= 'active' if current_page?('/welcome') %>">Home</a></li>
+        <li><a href="/past_meetings" class="<%= 'active' if current_page?('/past_meetings') %>">Past Meetings</a></li>
+        <li><a href="/settings" class="<%= 'active' if current_page?('/settings') %>">Settings</a></li>
+      </ul>
+    </div>
+    <div class="nav-right">
+      <%= button_to "Sign Out", sign_out_path, method: :delete, class: "signout-btn", form: { style: "display: inline;" } %>
+    </div>
+  </div>
+</nav> 

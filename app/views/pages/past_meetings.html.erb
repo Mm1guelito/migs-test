@@ -1,0 +1,298 @@
+<%= render 'shared/top_nav' %>
+
+<div class="container pt-10">
+    <div class="filters">
+        <div class="filter-group">
+            <label class="filter-label">Month</label>
+            <select class="filter-select" id="monthFilter">
+                <option value="">All Months</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label">Year</label>
+            <select class="filter-select" id="yearFilter">
+                <option value="">All Years</option>
+                <option value="2025" selected>2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+            </select>
+        </div>
+
+        <div class="filter-group search-box">
+            <label class="filter-label">Search Meetings</label>
+            <input type="text" class="search-input" placeholder="Search by title, attendee, or topic..." id="searchInput">
+        </div>
+
+        <button class="clear-filters" onclick="clearFilters()">Clear Filters</button>
+    </div>
+
+    <div class="meetings-section">
+        <div class="results-count" id="resultsCount">
+            <% if @past_events.present? %>
+              Showing <%= [@past_events.size, 9].min %> of <%= @past_events.size %> meetings
+            <% else %>
+              No past meetings found
+            <% end %>
+        </div>
+
+        <div class="meetings-grid" id="meetingsGrid">
+          <% if @past_events.present? %>
+            <% @past_events.first(9).each do |event| %>
+              <div class="meeting-card" style="display: flex; flex-direction: column; gap: 0.5rem;" onclick="window.location.href='<%= meeting_detail_path(event) %>'">
+                <div class="meeting-title"><%= event.title %></div>
+                <div class="meeting-date">
+                  📅 <%= event.date.present? ? Date.parse(event.date).strftime('%b %d, %Y') : event.start_time_in_timezone.strftime('%b %d, %Y') rescue '' %> • ⏰ <%= event.start_time_24h %> - <%= event.end_time_24h %>
+                </div>
+                <div class="detail-row" style="margin-bottom: 0.5rem;">
+                  <span class="detail-label">Duration:</span>
+                  <span class="detail-value">
+                    <% if event.start_time && event.end_time %>
+                      <%= distance_of_time_in_words(event.start_time, event.end_time) %>
+                    <% else %>
+                      N/A
+                    <% end %>
+                  </span>
+                </div>
+                <div class="detail-row" style="margin-bottom: 0.5rem;">
+                  <% platform =
+                    if event.meeting_url&.include?('zoom.us')
+                      'Zoom'
+                    elsif event.meeting_url&.include?('meet.google.com')
+                      'Google Meet'
+                    elsif event.meeting_url&.include?('teams.microsoft.com')
+                      'Teams'
+                    else
+                      'Other'
+                    end
+                  %>
+                  <span class="detail-label">Platform:</span>
+                  <span class="detail-value"><%= platform %></span>
+                </div>
+                <div class="detail-row" style="flex-direction: column; align-items: flex-start;">
+                  <span class="detail-label" style="margin-bottom: 0.25rem;">Attendees:</span>
+                  <% if event.attendees.present? %>
+                    <% event.attendees.each do |attendee| %>
+                      <span class="attendee-chip" style="word-break: break-all; background: #f1f5f9; color: #2563eb; padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-size: 0.95rem; display: block; margin-bottom: 2px;"> <%= attendee %> </span>
+                    <% end %>
+                  <% else %>
+                    <span class="attendee-chip">No guests</span>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          <% else %>
+            <div class="text-center text-gray-500 py-12">No past meetings found.</div>
+          <% end %>
+        </div>
+
+        <% if @past_events.size > 9 %>
+          <button class="load-more" onclick="loadMoreMeetings()">Load More Meetings</button>
+        <% end %>
+    </div>
+</div>
+
+<script>
+    let currentPage = 1;
+    const meetingsPerPage = 9;
+    let allMeetings = [];
+    
+    // Store all meetings data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const meetingCards = document.querySelectorAll('.meeting-card');
+        allMeetings = Array.from(meetingCards).map(card => ({
+            element: card,
+            title: card.querySelector('.meeting-title').textContent,
+            date: card.querySelector('.meeting-date').textContent,
+            attendees: Array.from(card.querySelectorAll('.attendee-chip')).map(chip => chip.textContent.trim())
+        }));
+    });
+
+    function loadMoreMeetings() {
+        const startIndex = currentPage * meetingsPerPage;
+        const endIndex = startIndex + meetingsPerPage;
+        const meetingsGrid = document.getElementById('meetingsGrid');
+        
+        // Show next set of meetings
+        for (let i = startIndex; i < endIndex && i < allMeetings.length; i++) {
+            const meeting = allMeetings[i];
+            meeting.element.style.display = 'flex';
+        }
+        
+        currentPage++;
+        
+        // Hide load more button if we've shown all meetings
+        const loadMoreButton = document.querySelector('.load-more');
+        if (endIndex >= allMeetings.length) {
+            if (loadMoreButton) {
+                loadMoreButton.style.display = 'none';
+            }
+        }
+        
+        // Update results count
+        const visibleCount = Math.min(endIndex, allMeetings.length);
+        document.getElementById('resultsCount').textContent = 
+            `Showing ${visibleCount} of ${allMeetings.length} meetings`;
+    }
+
+    function clearFilters() {
+        document.getElementById('monthFilter').value = '';
+        document.getElementById('yearFilter').value = '';
+        document.getElementById('searchInput').value = '';
+        removeHighlights();
+        currentPage = 1;
+        filterMeetings();
+    }
+
+    function removeHighlights() {
+        // Remove highlights from all titles
+        document.querySelectorAll('.meeting-title').forEach(title => {
+            title.innerHTML = title.textContent;
+        });
+        
+        // Remove highlights from all attendee chips
+        document.querySelectorAll('.attendee-chip').forEach(chip => {
+            chip.innerHTML = chip.textContent;
+        });
+    }
+
+    function filterMeetings() {
+        const monthFilter = document.getElementById('monthFilter').value;
+        const yearFilter = document.getElementById('yearFilter').value;
+        const searchInput = document.getElementById('searchInput').value.toLowerCase().trim();
+        
+        // Remove existing highlights before applying new ones
+        removeHighlights();
+        
+        const meetingCards = document.querySelectorAll('.meeting-card');
+        let visibleCount = 0;
+        let filteredCount = 0;
+        
+        meetingCards.forEach((card, index) => {
+            const dateText = card.querySelector('.meeting-date').textContent;
+            const title = card.querySelector('.meeting-title').textContent.toLowerCase();
+            const attendees = Array.from(card.querySelectorAll('.attendee-chip'))
+                .map(chip => chip.textContent.trim().toLowerCase());
+            
+            // Extract date components
+            const dateMatch = dateText.match(/📅\s*([A-Za-z]+\s+\d+,\s+\d+)/);
+            if (!dateMatch) return;
+            
+            const date = new Date(dateMatch[1]);
+            const cardMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+            const cardYear = date.getFullYear().toString();
+            
+            // Apply filters
+            const matchesMonth = !monthFilter || cardMonth === monthFilter;
+            const matchesYear = !yearFilter || cardYear === yearFilter;
+            
+            // Enhanced search matching
+            const matchesSearch = !searchInput || 
+                title.includes(searchInput) || 
+                attendees.some(attendee => attendee.includes(searchInput));
+            
+            if (matchesMonth && matchesYear && matchesSearch) {
+                filteredCount++;
+                // Only show first 9 meetings initially
+                if (filteredCount <= meetingsPerPage) {
+                    card.style.display = 'flex';
+                    visibleCount++;
+                    
+                    // Highlight matching text if there's a search term
+                    if (searchInput) {
+                        // Highlight title matches
+                        const titleElement = card.querySelector('.meeting-title');
+                        const originalTitle = titleElement.textContent;
+                        const highlightedTitle = originalTitle.replace(
+                            new RegExp(searchInput, 'gi'),
+                            match => `<span class="highlight">${match}</span>`
+                        );
+                        titleElement.innerHTML = highlightedTitle;
+                        
+                        // Highlight attendee matches
+                        const attendeeChips = card.querySelectorAll('.attendee-chip');
+                        attendeeChips.forEach(chip => {
+                            const originalText = chip.textContent.trim();
+                            if (originalText.toLowerCase().includes(searchInput)) {
+                                const highlightedText = originalText.replace(
+                                    new RegExp(searchInput, 'gi'),
+                                    match => `<span class="highlight">${match}</span>`
+                                );
+                                chip.innerHTML = highlightedText;
+                            }
+                        });
+                    }
+                } else {
+                    card.style.display = 'none';
+                }
+            } else {
+                card.style.display = 'none';
+            }
+        });
+        
+        // Update results count
+        const resultsCount = document.getElementById('resultsCount');
+        resultsCount.textContent = `Showing ${visibleCount} of ${filteredCount} meetings`;
+        
+        // Show/hide load more button
+        const loadMoreButton = document.querySelector('.load-more');
+        if (loadMoreButton) {
+            loadMoreButton.style.display = filteredCount > meetingsPerPage ? 'block' : 'none';
+        }
+    }
+
+    // Add debounce function to prevent too many rapid searches
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Add event listeners with debounce for search
+    document.getElementById('monthFilter').addEventListener('change', filterMeetings);
+    document.getElementById('yearFilter').addEventListener('change', filterMeetings);
+    document.getElementById('searchInput').addEventListener('input', debounce(filterMeetings, 300));
+
+    // Add some CSS for highlighting
+    const style = document.createElement('style');
+    style.textContent = `
+        .highlight {
+            background-color: #fef08a;
+            padding: 2px;
+            border-radius: 2px;
+        }
+
+        .meeting-card {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+
+        .meeting-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border-color: #d1d5db;
+        }
+    `;
+    document.head.appendChild(style);
+</script> 

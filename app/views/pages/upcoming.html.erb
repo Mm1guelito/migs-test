@@ -1,0 +1,427 @@
+<%= render 'shared/top_nav' %>
+<div class="container pt-16">
+    <%= link_to "← Back to Calendar", welcome_path, class: "back-btn gradient-btn" %>
+    
+    <div class="page-header">
+        <% if @events.present? && @events.first.date.present? %>
+          <h1 class="page-title">Upcoming Meetings for <%= Date.parse(@events.first.date).strftime('%B %-d, %Y') %></h1>
+        <% elsif params[:date].present? %>
+          <h1 class="page-title">Upcoming Meetings for <%= Date.parse(params[:date]).strftime('%B %-d, %Y') %></h1>
+        <% else %>
+          <h1 class="page-title">Upcoming Meetings</h1>
+        <% end %>
+    </div>
+
+    <div class="meetings-container">
+      <% if @events.present? %>
+        <% @events.each do |event| %>
+          <div class="meeting-card">
+            <div class="meeting-header">
+              <h2 class="meeting-title">
+                <%= event.title %>
+                <% if event.organizer.present? %>
+                  <span style="font-size:0.95em; color:#888; font-weight:400; margin-left:0.5em;">(<%= event.organizer %>)</span>
+                <% end %>
+              </h2>
+              <span class="status-badge">Upcoming</span>
+            </div>
+            <div class="meeting-details-row">
+              <div class="meeting-details-horizontal">
+                <div class="detail-item">
+                  <span class="time-icon">🕘</span>
+                  <% if event.start_time_24h.present? && event.end_time_24h.present? %>
+                    <span><%= event.start_time_24h %>-<%= event.end_time_24h %></span>
+                  <% else %>
+                    <span><%= event.start_time_in_timezone.strftime('%b %-d, %l:%M %p') %></span>
+                  <% end %>
+                </div>
+                <div class="detail-item">
+                  <span class="duration-icon">⏱️</span>
+                  <span><%= ((event.end_time_in_timezone - event.start_time_in_timezone) / 60).to_i %> min</span>
+                </div>
+                <div class="detail-item meeting-link-status">
+                  <% if event.meeting_url.present? %>
+                    <span class="link-icon">🔗</span>
+                    <span class="link-detected">Meeting Link Detected</span>
+                    <% unless event.recall_transcript.present? && event.recall_video_url.present? %>
+                      <a href="<%= join_and_schedule_bot_calendar_event_path(event) %>" target="_blank" class="ml-2 text-blue-600 underline join-with-timer" data-bot-time="<%= event.bot_time %>" onclick="handleJoinClick(event)">Join</a>
+                      <span class="bot-timer" id="bot-timer-<%= event.id %>" style="margin-left: 10px; color: #4CAF50; font-weight: bold;"></span>
+                    <% end %>
+                  <% else %>
+                    <span class="warning-icon">⚠️</span>
+                    <span class="link-missing">No Meeting Link</span>
+                  <% end %>
+                </div>
+              </div>
+              <div class="attendees">
+                <span class="attendees-icon">👥</span>
+                <% if event.attendees.present? %>
+                  <%= event.attendees.join(', ') %>
+                <% else %>
+                  No guests
+                <% end %>
+              </div>
+            </div>
+            <div class="notetaker-section">
+              <div class="notetaker-control">
+                <span class="notetaker-icon">🎤</span>
+                <span class="notetaker-label">AI Notetaker</span>
+                <div class="toggle-switch <%= event.bot_join ? 'active' : '' %> <%= 'disabled' if event.meeting_url.blank? %>" data-event-id="<%= event.id %>" <%= 'title="Enable notetaker by adding a meeting link"' if event.meeting_url.blank? %>>
+                  <div class="toggle-slider"></div>
+                </div>
+              </div>
+              <% if event.meeting_url.present? %>
+                <div class="bot-status <%= event.bot_join ? 'active' : '' %>">
+                  <% if event.bot_join %>
+                    Bot will join 
+                    <select class="bot-time-dropdown" data-event-id="<%= event.id %>">
+                      <% (0..60).each do |m| %>
+                        <option value="<%= m %>" <%= (event.bot_time || 0).to_i == m ? 'selected' : '' %>><%= m %> min</option>
+                      <% end %>
+                    </select>
+                    early
+                  <% else %>
+                    No bot scheduled
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+            <% if event.recall_bot_id.present? %>
+              <div class="media-status-section">
+                <% if event.recall_transcript.present? && event.recall_video_url.present? %>
+                  <div class="media-available">
+                    <span class="media-icon">✅</span>
+                    <span class="media-text">Recording & Transcript Available</span>
+                    <a href="<%= event.recall_video_url %>" target="_blank" class="view-media-btn">View Recording</a>
+                  </div>
+                <% elsif event.recall_bot_id.present? %>
+                  <div class="media-processing">
+                    <span class="media-icon">⏳</span>
+                    <span class="media-text">Processing Recording...</span>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      <% else %>
+        <div class="text-center text-gray-500 py-12">No meetings scheduled for this day.</div>
+      <% end %>
+    </div>
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toast-container" class="toast-container"></div>
+
+<%= javascript_tag do %>
+    function handleJoinClick(event) {
+      const currentUrl = window.location.href;
+      
+      setTimeout(() => {
+        window.location.href = currentUrl;
+      }, 2000);
+    }
+
+    function toggleNotetaker(element, hasLink) {
+        if (!hasLink) {
+            // Don't allow toggle if no meeting link
+            return;
+        }
+
+        element.classList.toggle('active');
+        
+        const meetingCard = element.closest('.meeting-card');
+        const statusElement = meetingCard.querySelector('.bot-status');
+        const configBtn = meetingCard.querySelector('.config-btn');
+        
+        if (element.classList.contains('active')) {
+            statusElement.textContent = 'Bot will join 0 min early';
+            statusElement.className = 'bot-status active';
+            configBtn.classList.remove('disabled');
+        } else {
+            statusElement.textContent = 'No bot scheduled';
+            statusElement.className = 'bot-status';
+            configBtn.classList.remove('disabled');
+        }
+
+        // In a real app, this would make an API call to update the notetaker setting
+        const meetingTitle = meetingCard.querySelector('.meeting-title').textContent;
+        console.log('Notetaker toggled for:', meetingTitle);
+    }
+
+    function openConfig(meetingTitle) {
+        // In a real app, this would open a configuration modal or page
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        `;
+        
+        // Generate options for 1-60 minutes
+        let options = '';
+        for (let i = 1; i <= 60; i++) {
+            const selected = i === 0 ? 'selected' : '';
+            const label = i === 1 ? '1 minute' : `${i} minutes`;
+            options += `<option value="${i}" ${selected}>${label}</option>`;
+        }
+
+        modal.innerHTML = `
+            <div style="
+                background: white;
+                padding: 2rem;
+                border-radius: 12px;
+                max-width: 400px;
+                width: 90%;
+            ">
+                <h3 style="margin: 0 0 1.5rem 0;">Configure Bot for: ${meetingTitle}</h3>
+                <div style="margin-bottom: 2rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Join meeting early by:</label>
+                    <select id="minutesSelect" style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem;">
+                        ${options}
+                    </select>
+                </div>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button onclick="this.closest('div').remove()" style="
+                        padding: 0.75rem 1.5rem;
+                        border: 1px solid #ddd;
+                        background: white;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 1rem;
+                    ">Cancel</button>
+                    <button onclick="saveConfig('${meetingTitle}', this)" style="
+                        padding: 0.75rem 1.5rem;
+                        border: none;
+                        background: #4CAF50;
+                        color: white;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 1rem;
+                    ">Save</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+
+    function saveConfig(meetingTitle, button) {
+        const minutes = document.getElementById('minutesSelect').value;
+        const meetingCard = document.querySelector(`.meeting-card:has(.meeting-title:contains('${meetingTitle}'))`);
+        const statusElement = meetingCard.querySelector('.bot-status');
+        
+        statusElement.textContent = `Bot will join ${minutes} min early`;
+        statusElement.className = 'bot-status active';
+        
+        // In a real app, this would make an API call to save the configuration
+        console.log('Saved config for:', meetingTitle, 'Minutes:', minutes);
+        
+        // Close the modal
+        button.closest('div').remove();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Toggle switch AJAX
+      document.querySelectorAll('.toggle-switch').forEach(function(toggle) {
+        toggle.addEventListener('click', function() {
+          if (this.classList.contains('disabled')) {
+            return; // Don't proceed if toggle is disabled
+          }
+
+          // Prevent multiple clicks while request is processing
+          if (this.dataset.processing === 'true') {
+            return;
+          }
+          this.dataset.processing = 'true';
+
+          var eventId = this.getAttribute('data-event-id');
+          var isActive = this.classList.contains('active');
+          var newValue = !isActive;
+          
+          // Prepare the data based on toggle state
+          var requestData = {
+            calendar_event: {
+              bot_join: newValue,
+              bot_time: newValue ? 0 : 0  // Set to 0 if enabled, 0 if disabled
+            }
+          };
+
+          fetch('/calendar_events/' + eventId + '/toggle_bot', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify(requestData)
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              this.classList.toggle('active');
+              const botStatus = this.closest('.meeting-card').querySelector('.bot-status');
+              if (botStatus) {
+                botStatus.classList.toggle('active');
+                botStatus.textContent = newValue ? 'Bot will join 0 min early' : 'No bot scheduled';
+              }
+              showToast('Notetaker ' + (newValue ? 'enabled' : 'disabled'));
+            } else {
+              showToast('Failed to update notetaker', 'error');
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            showToast('Failed to update notetaker', 'error');
+          })
+          .finally(() => {
+            this.dataset.processing = 'false';
+          });
+        });
+      });
+
+      // Start polling for media availability
+      const eventsToCheck = document.querySelectorAll('.media-processing');
+      if (eventsToCheck.length > 0) {
+        const eventIds = Array.from(eventsToCheck).map(el => 
+          el.closest('.meeting-card').querySelector('.toggle-switch').getAttribute('data-event-id')
+        );
+
+        console.log('Starting media polling for events:', eventIds); // Debug log
+
+        const checkMediaStatus = () => {
+          console.log('Checking media status...'); // Debug log
+          const promises = eventIds.map(eventId => 
+            fetch(`/calendar_events/${eventId}/media_status`, {
+              headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+              }
+            })
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+              })
+              .then(data => {
+                console.log('Media status for event', eventId, ':', data); // Debug log
+                if (data.media_available) {
+                  console.log('Media available, redirecting...'); // Debug log
+                  window.location.href = '/welcome';
+                  return true;
+                }
+                return false;
+              })
+              .catch(error => {
+                console.error('Error checking media status:', error);
+                return false;
+              })
+          );
+
+          Promise.all(promises).then(results => {
+            if (results.some(completed => completed)) {
+              console.log('Media available, stopping polling'); // Debug log
+              clearInterval(pollingInterval);
+            }
+          });
+        };
+
+        // Check immediately and then every 30 seconds
+        checkMediaStatus();
+        const pollingInterval = setInterval(checkMediaStatus, 30000);
+
+        // Clean up interval when leaving the page
+        window.addEventListener('beforeunload', () => {
+          clearInterval(pollingInterval);
+        });
+      }
+    });
+<% end %>
+
+<style>
+  .toggle-switch.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+  .bot-time-dropdown[disabled] {
+    background: #eee;
+    color: #aaa;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+  }
+
+  .toast {
+    background: white;
+    color: #333;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-top: 10px;
+    transform: translateX(120%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .toast.show {
+    transform: translateX(0);
+  }
+
+  .toast-success {
+    border-left: 4px solid #4CAF50;
+  }
+
+  .toast-error {
+    border-left: 4px solid #dc3545;
+  }
+
+  .media-status-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dee2e6;
+  }
+
+  .media-available, .media-processing {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .media-available {
+    color: #28a745;
+  }
+
+  .media-processing {
+    color: #6c757d;
+  }
+
+  .view-media-btn {
+    margin-left: auto;
+    padding: 0.4rem 0.8rem;
+    background: #4CAF50;
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: background-color 0.3s;
+  }
+
+  .view-media-btn:hover {
+    background: #43a047;
+    color: white;
+  }
+</style> 

@@ -1,0 +1,52 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  title: MyString
+  unique_id: MyString
+  start_time: 2025-05-25 11:06:27
+  end_time: 2025-05-25 11:06:27
+  organizer: MyString
+  description: MyText
+  attendees: MyText
+  google_calendar_link: MyString
+  location: MyString
+  hangout_link: MyString
+  bot_time: 1
+  bot_join: false
+  user: one
+  date: '2025-05-25'
+  start_time_24h: '11:06'
+  end_time_24h: '11:06'
+
+two:
+  title: MyString
+  unique_id: MyString
+  start_time: 2025-05-25 11:06:27
+  end_time: 2025-05-25 11:06:27
+  organizer: MyString
+  description: MyText
+  attendees: MyText
+  google_calendar_link: MyString
+  location: MyString
+  hangout_link: MyString
+  bot_time: 1
+  bot_join: false
+  user: two
+  date: '2025-05-25'
+  start_time_24h: '11:06'
+  end_time_24h: '11:06'
+
+test_meeting:
+  title: "Test Meeting with Recall Bot"
+  unique_id: "test_meeting_123"
+  start_time: <%= 1.hour.from_now %>
+  end_time: <%= 2.hours.from_now %>
+  timezone: "UTC"
+  organizer: "test@example.com"
+  description: "Testing Recall.ai integration"
+  attendees: ["test@example.com", "test2@example.com"]
+  meeting_url: "https://meet.google.com/test-meeting-123"
+  bot_join: true
+  bot_time: 2
+  user: one
+  google_account: one
