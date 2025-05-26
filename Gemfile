@@ -62,7 +62,7 @@ gem 'omniauth_openid_connect'
 # Google Calendar API
 gem 'google-api-client'
 
-gem 'sidekiq', '~> 7.2'
+gem 'sidekiq', '~> 7.3'
 gem 'httparty', '~> 0.21.0'
 gem 'csv', '~> 3.2'
 gem 'multi_xml', '~> 0.6'
