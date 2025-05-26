@@ -2,7 +2,6 @@ class SocialPostsController < ApplicationController
   before_action :authenticate_user!
 
   def create
-    params[:social_post][:content] = params[:social_post][:example]
     @social_post = SocialPost.new(social_post_params)
     @social_post.user_id = current_user.id
     
