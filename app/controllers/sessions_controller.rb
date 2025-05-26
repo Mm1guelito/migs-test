@@ -106,6 +106,15 @@ class SessionsController < ApplicationController
     session[:access_token] = auth['credentials']['token']
     session[:refresh_token] = auth['credentials']['refresh_token']
     session[:token_expires_at] = Time.at(auth['credentials']['expires_at'])
+
+    # Update the primary Google account with the tokens
+    if user.primary_account
+      user.primary_account.update!(
+        access_token: auth['credentials']['token'],
+        refresh_token: auth['credentials']['refresh_token'],
+        token_expires_at: Time.at(auth['credentials']['expires_at'])
+      )
+    end
   end
 
   def create_or_find_user_from_linkedin(auth)
