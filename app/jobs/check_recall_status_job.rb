@@ -4,7 +4,9 @@ class CheckRecallStatusJob
   include Sidekiq::Job
   sidekiq_options retry: 3, queue: 'recall', timeout: 30.seconds
 
-  BATCH_SIZE = 10  # Process events in smaller batches
+  BATCH_SIZE = 20  # Increased batch size
+  ACTIVE_STATE_INTERVAL = 10.seconds  # Shorter interval for active states
+  INACTIVE_STATE_INTERVAL = 30.seconds  # Longer interval for inactive states
 
   # Class method to check all existing calendar events with recall_bot_id
   def self.check_all_pending_events
@@ -81,7 +83,7 @@ class CheckRecallStatusJob
           Rails.logger.error "Error getting media for event #{event.id}: #{e.message}"
           # Only retry if we haven't exceeded max retries
           if retry_count < 3
-            self.class.perform_in(30.seconds, event.id)
+            self.class.perform_in(ACTIVE_STATE_INTERVAL, event.id)
           else
             Rails.logger.error "Max retries exceeded for event #{event.id}"
           end
@@ -91,21 +93,25 @@ class CheckRecallStatusJob
         Rails.logger.error "Bot #{event.recall_bot_id} failed for event #{event.id}. Error: #{error_message}"
         # Don't reschedule for error/fatal states
         event.update!(recall_transcript: [], recall_video_url: nil)
-      when 'joining_call', 'in_waiting_room'
-        # Bot is still joining or in waiting room, wait a bit longer
-        self.class.perform_in(30.seconds, event.id)
-        Rails.logger.info "Bot is #{current_status} for event #{event.id}, waiting..."
+      when 'joining_call', 'in_waiting_room', 'in_call_not_recording', 'in_call_recording'
+        # Bot is in an active state, check more frequently
+        self.class.perform_in(ACTIVE_STATE_INTERVAL, event.id)
+        Rails.logger.info "Bot is #{current_status} for event #{event.id}, checking again in #{ACTIVE_STATE_INTERVAL} seconds..."
+      when 'call_ended', 'recording_done'
+        # Bot is finishing up, check more frequently
+        self.class.perform_in(ACTIVE_STATE_INTERVAL, event.id)
+        Rails.logger.info "Bot is #{current_status} for event #{event.id}, checking again in #{ACTIVE_STATE_INTERVAL} seconds..."
       else
-        # Handle any other status by rescheduling
+        # Handle any other status by rescheduling with longer interval
         Rails.logger.info "Unknown status '#{current_status}' for event #{event.id}, rescheduling check..."
-        self.class.perform_in(30.seconds, event.id)
+        self.class.perform_in(INACTIVE_STATE_INTERVAL, event.id)
       end
     rescue => e
       Rails.logger.error "Error checking bot status for event #{event.id}: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
       # Only retry if we haven't exceeded max retries
       if retry_count < 3
-        self.class.perform_in(30.seconds, event.id)
+        self.class.perform_in(INACTIVE_STATE_INTERVAL, event.id)
       else
         Rails.logger.error "Max retries exceeded for event #{event.id}"
       end

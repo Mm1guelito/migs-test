@@ -1,5 +1,5 @@
 check_recall_status:
-  cron: "*/1 * * * *"  # Every minute
+  cron: "*/30 * * * * *"  # Every 30 seconds
   class: CheckRecallStatusJob
   queue: default
   args: [] 
