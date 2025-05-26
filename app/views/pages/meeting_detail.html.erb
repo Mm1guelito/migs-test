@@ -175,7 +175,7 @@
                             <button class="social-btn social-btn-configure" onclick="openConfigModal()">
                                 Configure Post
                             </button>
-                            <button class="social-btn social-btn-primary">Save</button>
+                            <button class="social-btn social-btn-primary" onclick="saveDraftPost()">Save</button>
                         </div>
                     </div>
                 </div>
@@ -287,6 +287,35 @@
     // Initialize with transcript content on page load
     document.addEventListener('DOMContentLoaded', function() {
         showContent('transcript');
+        
+        // Auto-save the AI-generated content if it exists
+        const content = document.getElementById('socialPostContentForCopy').value;
+        if (content && content.trim() !== '') {
+            const formData = new FormData();
+            formData.append('social_post[name]', 'AI generated');
+            formData.append('social_post[platform]', 'linkedin');
+            formData.append('social_post[content]', content);
+            formData.append('social_post[type]', 'generate post');
+            
+            fetch('/social_posts?meeting_id=<%= @event.id %>', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Reload the page to show the new post
+                    window.location.reload();
+                } else {
+                    console.error('Failed to auto-save post');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
     });
 
     // Social post copy functionality
@@ -462,4 +491,47 @@
             });
         }
     });
+
+    function saveDraftPost() {
+        const content = document.getElementById('socialPostContentForCopy').value;
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('social_post[name]', 'AI generated(Linkedin post)');
+        formData.append('social_post[platform]', 'linkedin');
+        formData.append('social_post[content]', content);
+        formData.append('social_post[type]', 'generate post');
+        
+        // Send AJAX request
+        fetch('/social_posts?meeting_id=<%= @event.id %>', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                // Show success message
+                const saveButton = event.target;
+                const originalText = saveButton.textContent;
+                saveButton.textContent = '✅ Saved!';
+                saveButton.style.background = '#28a745';
+                
+                // Reset button after 2 seconds
+                setTimeout(() => {
+                    saveButton.textContent = originalText;
+                    saveButton.style.background = '';
+                    // Reload the page to show the new post
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error('Failed to save post');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to save post. Please try again.');
+        });
+    }
 </script>
