@@ -4,11 +4,11 @@ class SocialPostsController < ApplicationController
   def create
     @social_post = SocialPost.new(social_post_params)
     @social_post.user_id = current_user.id
-    
+
     if @social_post.save
-      redirect_to meeting_detail_path(params[:meeting_id]), notice: 'Social post was successfully created.'
+      redirect_to meeting_detail_path(@social_post.description), notice: 'Post was successfully created.'
     else
-      redirect_to meeting_detail_path(params[:meeting_id]), alert: 'Failed to create social post.'
+      redirect_to meeting_detail_path(@social_post.description), alert: 'Failed to create post. Please try again.'
     end
   end
 
@@ -37,6 +37,6 @@ class SocialPostsController < ApplicationController
   private
 
   def social_post_params
-    params.require(:social_post).permit(:platform, :content, :name, :type, :description)
+    params.require(:social_post).permit(:name, :platform, :type, :content, :description)
   end
 end 

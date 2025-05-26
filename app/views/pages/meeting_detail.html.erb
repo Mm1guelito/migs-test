@@ -167,16 +167,16 @@
                     <!-- Hidden textarea for copying social post -->
                     <textarea id="socialPostContentForCopy" style="position: absolute; left: -9999px; opacity: 0;"><%= @social_post_content %></textarea>
                     
-                    <div class="social-draft-actions" style="display: flex; justify-content: space-between; align-items: center;">
-                        <button class="social-btn social-btn-secondary" onclick="copySocialPostContent()">
-                            <span>📋</span> Copy
-                        </button>
-                        <div style="display: flex; gap: 0.75rem;">
-                            <button class="social-btn social-btn-configure" onclick="openConfigModal()">
-                                Configure Post
-                            </button>
-                            <button class="social-btn social-btn-primary" onclick="saveDraftPost()">Save</button>
-                        </div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Draft Post</h3>
+                        <%= form_tag social_posts_path, method: :post, class: "inline" do %>
+                            <%= hidden_field_tag 'social_post[name]', 'AI generated' %>
+                            <%= hidden_field_tag 'social_post[platform]', 'linkedin' %>
+                            <%= hidden_field_tag 'social_post[type]', 'generate post' %>
+                            <%= hidden_field_tag 'social_post[description]', @event.id.to_s %>
+                            <%= hidden_field_tag 'social_post[content]', @social_post_content %>
+                            <%= submit_tag 'Post', class: "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors" %>
+                        <% end %>
                     </div>
                 </div>
 
