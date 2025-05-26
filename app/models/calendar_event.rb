@@ -8,7 +8,7 @@ class CalendarEvent < ApplicationRecord
   validates :timezone, presence: true
 
   # Store attendees as JSON
-  serialize :attendees, Array, coder: JSON
+  serialize :attendees, coder: JSON
 
   # Scopes
   scope :for_user, ->(user) { where(user: user) }
