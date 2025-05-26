@@ -117,6 +117,19 @@ class PagesController < ApplicationController
     # Generate social post content for the draft section
     if @event.recall_transcript.present?
       @social_post_content = SocialHelper.generate_post(@event.recall_transcript, platform: 'linkedin')
+      
+      # Auto-save the generated content if no post exists for this meeting
+      unless SocialPost.exists?(user_id: current_user.id, description: @event.id.to_s)
+        SocialPost.create!(
+          name: 'AI generated',
+          platform: 'linkedin',
+          content: @social_post_content,
+          type: 'generate post',
+          user_id: current_user.id,
+          description: @event.id.to_s  # Store the meeting ID in description to track which meeting this post belongs to
+        )
+      end
+      
       @existing_social_posts = SocialPost.where(platform: ['linkedin', 'facebook'])
     else
       @social_post_content = nil
