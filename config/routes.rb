@@ -53,9 +53,5 @@ Rails.application.routes.draw do
 
   patch 'social_bot_config', to: 'social_bot_configs#update'
 
-  resources :social_posts do
-    collection do
-      post :quick_post
-    end
-  end
+  resources :social_post_configs, only: [:create]
 end

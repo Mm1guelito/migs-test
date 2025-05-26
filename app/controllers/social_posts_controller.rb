@@ -6,26 +6,9 @@ class SocialPostsController < ApplicationController
     @social_post.user_id = current_user.id
 
     if @social_post.save
-      redirect_to meeting_detail_path(params[:meeting_id]), notice: 'Social post was successfully created.'
+      redirect_to meeting_detail_path(@social_post.description), notice: 'Post was successfully created.'
     else
-      redirect_to meeting_detail_path(params[:meeting_id]), alert: 'Failed to create social post.'
-    end
-  end
-
-  def quick_post
-    @social_post = SocialPost.new(
-      name: 'AI generated',
-      platform: 'linkedin',
-      type: 'generate post',
-      content: params[:content],
-      description: params[:meeting_id],
-      user_id: current_user.id
-    )
-
-    if @social_post.save
-      redirect_to meeting_detail_path(params[:meeting_id]), notice: 'Post was successfully created.'
-    else
-      redirect_to meeting_detail_path(params[:meeting_id]), alert: 'Failed to create post. Please try again.'
+      redirect_to meeting_detail_path(@social_post.description), alert: 'Failed to create post. Please try again.'
     end
   end
 

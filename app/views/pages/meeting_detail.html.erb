@@ -169,9 +169,12 @@
                     
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold">Draft Post</h3>
-                        <%= form_tag quick_post_social_posts_path, method: :post, class: "inline" do %>
-                            <%= hidden_field_tag 'content', @social_post_content %>
-                            <%= hidden_field_tag 'meeting_id', @event.id %>
+                        <%= form_tag social_posts_path, method: :post, class: "inline" do %>
+                            <%= hidden_field_tag 'social_post[name]', 'AI generated' %>
+                            <%= hidden_field_tag 'social_post[platform]', 'linkedin' %>
+                            <%= hidden_field_tag 'social_post[type]', 'generate post' %>
+                            <%= hidden_field_tag 'social_post[description]', @event.id.to_s %>
+                            <%= hidden_field_tag 'social_post[content]', @social_post_content %>
                             <%= submit_tag 'Post', class: "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors" %>
                         <% end %>
                     </div>
@@ -199,7 +202,7 @@
                 </div>
                 
                 <div class="social-modal-body">
-                    <%= form_with(model: SocialPost.new, url: social_posts_path(meeting_id: @event.id), local: true) do |f| %>
+                    <%= form_with(model: SocialPost.new, url: social_post_configs_path(meeting_id: @event.id), local: true) do |f| %>
                         <div class="social-form-group">
                             <%= f.label :name, "Name", class: "social-form-label" %>
                             <%= f.text_field :name, class: "social-form-input", placeholder: "Enter name..." %>
@@ -224,12 +227,11 @@
                             </div>
                         </div>
                         <div class="social-form-group">
-                            <%= f.label :example, "Example", class: "social-form-label" %>
+                            <%= f.label :example, "Content", class: "social-form-label" %>
                             <%= f.text_area :example,
                                 value: @event.recall_transcript.present? ? SocialHelper.concatenate_transcript(@event.recall_transcript) : nil,
                                 class: "social-form-textarea",
-                                rows: 7,
-                                readonly: true
+                                rows: 7
                             %>
                         </div>
                         <div class="flex justify-between">
